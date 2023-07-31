@@ -1,0 +1,10 @@
+python-dotenv == 1.0.0
+flask == 2.3.2
+flask_sqlalchemy == 3.0.5
+psycopg2-binary == 2.9.6
+pandas == 2.0.1
+requests == 2.31.0
+apscheduler == 3.10.1
+slack-sdk == 3.21.3
+kaggle == 1.5.16
+gunicorn
