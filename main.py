@@ -68,6 +68,41 @@ def send_slack_leaderboard(client, channel_id, competition, day_alert):
     send_slack_message(client, channel_id, text)
 
 
+def handle_start_competition(event_data, channel_id):
+    registered_competition = Competition.query.first()
+
+    if registered_competition is None: 
+        compe = event_data.get('text', '').split("startc ")[1]
+
+        if start_of_competition(compe):
+            new_compe = Competition(compe)
+            db.session.add(new_compe)
+            db.session.commit()
+            text = "kaggleコンペ:\n`" + compe + "`\nが配信設定されました.\n\nコンペの終了日を設定してください.\n/setdl [YYYY-MM-DD]"
+            send_slack_message(client, channel_id, text)
+        else:
+            send_slack_message(client, channel_id, compe + "は存在しません.")     
+    else:
+        text = "既にkaggleコンペ\n`" + registered_competition.name + "`\nが配信登録されています。"
+        send_slack_message(client, channel_id, text)
+
+        
+def handle_end_competition(channel_id):
+    registered_competition = Competition.query.first()
+
+    if registered_competition is None: 
+        text = "現在、kaggleコンペは配信登録されていません. \n /startc で配信登録してください."
+        send_slack_message(client, channel_id, text)
+    else:
+        text = "kaggleコンペ:\n`" + registered_competition.name + "`\nの配信登録を解除します。\nお疲れ様でした!"
+        send_slack_message(client, channel_id, text)
+        with app.app_context():  
+            registered_competition = Competition.query.first()
+            if registered_competition is not None:
+                db.session.delete(registered_competition)
+                db.session.commit()
+            
+            
 def schedule_reminder(due_date, days_before):
     trigger_date = due_date - timedelta(days_before)
     return trigger_date
@@ -97,47 +132,13 @@ def one_day_before(client, channel_id, competition):
     send_slack_leaderboard(client, channel_id, competition, day_alert)
     
     
-def result(client, channel_id, competition):
-    day_alert = "\n☕*コンペが終了しました*☕\n皆さんお疲れ様でした!\n\n最終結果をお知らせします。\n入賞者の皆さんおめでとう！🎉"
-    send_slack_leaderboard(client, channel_id, competition, day_alert)
+def result(client, channel_id,competition):
+    text = "\n☕*"+competition+"コンペが終了しました*☕\n皆さんお疲れ様でした!\n最終結果をコンペサイトで確認してください。\n入賞者の皆さんおめでとう！🎉"
+    send_slack_message(client, channel_id, text)
 
-
-def handle_start_competition(event_data, channel_id):
-    registered_competition = Competition.query.first() # get the first competition
-
-    if registered_competition is None: # if no competition is registered
-        compe = event_data.get('text', '').split("startc ")[1]
-
-        if start_of_competition(compe):
-            new_compe = Competition(compe)
-            db.session.add(new_compe)
-            db.session.commit()
-            text = "kaggleコンペ:\n`" + compe + "`\nが配信設定されました.\n\nコンペの終了日を設定してください.\n/setdl [YYYY-MM-DD]"
-            send_slack_message(client, channel_id, text)
-        else:
-            send_slack_message(client, channel_id, compe + "は存在しません.")     
-    else:
-        text = "既にkaggleコンペ\n`" + registered_competition.name + "`\nが配信登録されています。"
-        send_slack_message(client, channel_id, text)
-
-        
-def handle_end_competition(event_data, channel_id):
-    registered_competition = Competition.query.first() # get the first competition
-
-    if registered_competition is None: # if no competition is registered
-        text = "現在、kaggleコンペは配信登録されていません. \n /startc で配信登録してください."
-        send_slack_message(client, channel_id, text)
-    else:
-        text = "kaggleコンペ:\n`" + registered_competition.name + "`\nの配信登録を解除します。\nお疲れ様でした!"
-        send_slack_message(client, channel_id, text)
-        if scheduler.running:
-            scheduler.remove_all_jobs()
-        db.session.delete(registered_competition)
-        db.session.commit()
-            
 
 def handle_check_competition(event_data, channel_id):
-    registered_competition = Competition.query.first() # get the first competition
+    registered_competition = Competition.query.first()
         
     if registered_competition is None:
         text = "現在、kaggleコンペは配信登録されていません.\n/startc で配信登録してください."
@@ -242,7 +243,7 @@ def setup_scheduler(due_date_str, channel_id):
     
     registered_competition = Competition.query.first()
     due_date = datetime.strptime(due_date_str, "%Y-%m-%d")
-    due_date = due_date.replace(hour=12, minute=0,second=0)
+    due_date = due_date.replace(hour=12, minute=00,second=0)
     
     scheduler.remove_all_jobs()
     JobModel.query.delete()
@@ -359,7 +360,7 @@ def handle_event():
                 handle_start_competition(event_data, channel_id)
 
             elif "/endc" in event_data.get('text', ''):
-                handle_end_competition(event_data, channel_id)
+                handle_end_competition(channel_id)
 
             elif "/checkc" in event_data.get('text', ''):
                 handle_check_competition(event_data, channel_id)
